@@ -14,13 +14,20 @@ class GAMEOFLIFE_API ACell : public AActor
 public:	
 	// Sets default values for this actor's properties
 	ACell();
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* StaticMeshComponent;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+private:
+	UStaticMesh* CellAliveMesh;
+	UStaticMesh* CellDeadMesh;
 
+	void SetCellAlive();
+	void SetCellDead();
 };
