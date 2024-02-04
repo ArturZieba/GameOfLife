@@ -2,7 +2,7 @@
 
 
 #include "Cell.h"
-#include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 ACell::ACell()
@@ -33,21 +33,47 @@ ACell::ACell()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ACell::ACell() : Failed to find Static Mesh for dead cell"))
 	}
-	
 
-	SetCellDead();
+	//Randomize state on initial spawn
+	if (UKismetMathLibrary::RandomBool()) 
+	{
+		SetCellAlive();
+	}
+	else
+	{
+		SetCellDead();
+	}
 
 	//Attach Static Mesh component to the Root Scene Component
 	StaticMeshComponent->SetupAttachment(RootComponent);
+
+	//On clicked implementation
+	FScriptDelegate Delegate;
+	Delegate.BindUFunction(this, "Clicked");
+	OnClicked.Add(Delegate);
+}
+
+void ACell::Clicked()
+{
+	if (IsAlive)
+	{
+		SetCellDead();
+	}
+	else
+	{
+		SetCellAlive();
+	}
 }
 
 void ACell::SetCellAlive()
 {
+	IsAlive = true;
 	StaticMeshComponent->SetStaticMesh(CellAliveMesh);
 }
 
 void ACell::SetCellDead()
 {
+	IsAlive = false;
 	StaticMeshComponent->SetStaticMesh(CellDeadMesh);
 }
 
@@ -55,8 +81,6 @@ void ACell::SetCellDead()
 void ACell::BeginPlay()
 {
 	Super::BeginPlay();
-
-	UKismetSystemLibrary::PrintString(this, FString("Cell"));
 }
 
 // Called every frame
@@ -66,3 +90,82 @@ void ACell::Tick(float DeltaTime)
 
 }
 
+void ACell::SetCoordinates(int32 CellX, int32 CellY)
+{
+	X = CellX;
+	Y = CellY;
+}
+
+void ACell::IsCellAlive(bool& Alive)
+{
+	Alive = IsAlive;
+}
+
+void ACell::CalculateNextState(TMap<int32, TMap<int32, AActor*>> CellGrid)
+{
+	int32 AliveNeighbours;
+	int32 i;
+	int32 j;
+	ACell* Cell;
+	bool NeighbourIsAlive;
+
+	//Itarate over all neighbouring cells and check if they are alive
+	AliveNeighbours = 0;
+	for (i = -1; i <= 1; i++)
+	{
+		for (j = -1; j <= 1; j++)
+		{
+			//Skip the cell checking neighbours (0,0 coordinate)
+			if (!((i == 0) && (j == 0)))
+			{
+				//Check that there is a cell at the grid coordinate or if it is cast outside the grid
+				if (CellGrid.Contains(X + i))
+				{
+					if (CellGrid[X + i].Contains(Y + j))
+					{
+						Cell = Cast <ACell>(CellGrid[X + i][Y + j]);
+						if (Cell)
+						{
+							Cell->IsCellAlive(NeighbourIsAlive);
+							if (NeighbourIsAlive)
+							{
+								AliveNeighbours++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	//Apply Game of Life rules
+	if (IsAlive && (AliveNeighbours < 2))
+	{
+		NextState = false;
+	}
+	else if (IsAlive && (AliveNeighbours == 2 || (AliveNeighbours == 3)))
+	{
+		NextState = true;
+	}
+	else if (IsAlive && (AliveNeighbours > 3))
+	{
+		NextState = false;
+	}
+	else if (!IsAlive && (AliveNeighbours == 3))
+	{
+		NextState = true;
+	}
+}
+
+void ACell::SetNewState()
+{
+	IsAlive = NextState;
+	if (IsAlive)
+	{
+		SetCellAlive();
+	}
+	else
+	{
+		SetCellDead();
+	}
+}

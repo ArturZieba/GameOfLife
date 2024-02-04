@@ -2,61 +2,122 @@
 
 
 #include "GOL.h"
+#include "Cell.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 // Sets default values
-AGOL::AGOL()
+UGOL::UGOL()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = true;
 
-
+	CalculationActive = false;
 }
 
 // Called when the game starts or when spawned
-void AGOL::BeginPlay()
+void UGOL::BeginPlay()
 {
 	Super::BeginPlay();
-
-	/*
-	//Initialize both grids with chosen X and Y dimensions
-	Original.Init(FMath::RandRange(0, 1), DisplayX);
-	Swap.Init(FMath::RandRange(0, 1), DisplayX);
-	
-	OriginalMap.Add(Original, DisplayY);
-	SwapMap.Add(Swap, DisplayY);
-
-	
-	for (int i = 0; i < Original.Num(); i++)
-	{
-		Original.Insert(FMath::RandRange(0, 1), i);
-		//UE_LOG(LogClass, Log, TEXT("%d"), Original[row]);
-	}
-	*/
-
-	//Spawn Cell chosen cell actor
-	//GetWorld()->SpawnActor<AActor>(Cell, GetActorLocation(), GetActorRotation());
-
-	CreateGrid(DisplayX, DisplayY, true);
+	SetComponentTickInterval(0.5f);
 }
 
 // Called every frame
-void AGOL::Tick(float DeltaTime)
+void UGOL::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-	Super::Tick(DeltaTime);
+	Super::TickComponent(DeltaTime, TickType , ThisTickFunction);
 
+	if (CalculationActive)
+	{
+		UpdateNextGeneration(false);
+		UpdateNextGeneration(true);
+	}
 }
 
-void AGOL::CreateGrid(int X, int Y, bool Alive) 
+void UGOL::ToggleCalculationActive()
 {
-	int i, j;
+	CalculationActive = !CalculationActive;
+}
 
-	for (i = 0; i < X; i++) 
+void UGOL::CreateGrid(int32 X, int32 Y, float CellPadding, float BaseLocationX, float BaseLocationY ) 
+{
+	int32 i, j;
+	FVector Location;
+	FRotator Rotation;
+	FActorSpawnParameters SpawnParameters;
+	AActor* SpawnedCell;
+	ACell* SpawnedCellActor;
+
+	SpawnParameters = FActorSpawnParameters();
+	SpawnParameters.Owner = GetOwner();
+	SpawnParameters.bNoFail = true;
+
+	Rotation = FRotator::ZeroRotator;
+
+	GridSizeX = X;
+	GridSizeY = Y;
+
+	for (i = 0; i < X; i++)
 	{
 		for (j = 0; j < Y; j++)
 		{
-			GetWorld()->SpawnActor<AActor>(Cell, GetActorLocation() + GetActorLocation().X * i + GetActorLocation().Y * j, GetActorRotation());
-			UE_LOG(LogClass, Log, TEXT("%d , %d"), i, j);
+			Location.X = (i * CellPadding) + BaseLocationX;
+			Location.Y = (j * CellPadding) + BaseLocationY;
+			Location.Z = 0;
+
+			SpawnedCell = GetWorld()->SpawnActor(Cell, &Location, &Rotation, SpawnParameters);
+			if (SpawnedCell)
+			{
+				SpawnedCellActor = Cast<ACell>(SpawnedCell);
+				if (SpawnedCellActor)
+				{
+					SpawnedCellActor->SetCoordinates(i, j);
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("AGOL::CreateGrid : Actor of a wrong type has been spawned"))
+				}
+			}
+
+			if (!Cells.Contains(i))
+			{
+				TMap<int32, AActor*> NewMap;
+				Cells.Add(i, NewMap);
+			}
+
+			if (!Cells[i].Contains(j))
+			{
+				Cells[i].Add(j, SpawnedCell);
+			}
+			else
+			{
+				Cells[i][j] = SpawnedCell;
+			}
+		}
+	}
+}
+
+void UGOL::UpdateNextGeneration(bool SetNewState)
+{
+	int32 i, j;
+	ACell* CellActor;
+
+	//Cells check their state in the next generation
+	for (i = 0; i < GridSizeX; i++)
+	{
+		for (j = 0; j < GridSizeY; j++)
+		{
+			CellActor = Cast<ACell>(Cells[i][j]);
+			if (CellActor)
+			{
+				if (SetNewState)
+				{
+					CellActor->SetNewState();
+				}
+				else
+				{
+					CellActor->CalculateNextState(Cells);
+				}
+			}
 		}
 	}
 }

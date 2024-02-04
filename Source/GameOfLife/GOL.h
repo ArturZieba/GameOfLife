@@ -3,24 +3,21 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+//#include "GameFramework/Actor.h"
+#include "Components/ActorComponent.h"
 #include "GOL.generated.h"
 
-UCLASS()
-class GAMEOFLIFE_API AGOL : public AActor
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class GAMEOFLIFE_API UGOL : public UActorComponent
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	AGOL();
+	UGOL();
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> Cell;
-	UPROPERTY(EditDefaultsOnly)
-	int DisplayX = 10;
-	UPROPERTY(EditDefaultsOnly)
-	int DisplayY = 10;
 
 protected:
 	// Called when the game starts or when spawned
@@ -28,8 +25,17 @@ protected:
 
 public:	
 	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	UFUNCTION(BlueprintCallable)
+	void ToggleCalculationActive();
+	UFUNCTION(BlueprintCallable)
+	void CreateGrid(int32 X, int32 Y, float CellPadding, float BaseLocationX, float BaseLocationY);
+
+	void UpdateNextGeneration(bool SetNewState);
 
 private:
-	void CreateGrid(int, int, bool);
+	TMap<int32, TMap<int32, AActor*>> Cells;
+	int32 GridSizeX;
+	int32 GridSizeY;
+	bool CalculationActive;
 };
